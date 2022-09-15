@@ -41,7 +41,43 @@ InputBuffer *new_input_buffer() {
 
 void print_prompt() { printf("db > "); }
 
+// & return a pointer
+// pointer are just variable that store memory address
+// in c everything is passed by value,
+// if we want to modify a variable i with a function,
+// we need to pass a pointer to i to the function to then manipulate the address
+//
+// simply passing the value of i to the function will not work
+// because the value of i will be copied
+//
+// In this case, we pass the address of i to the function
+// then we can manipulate the value of i with the address
+//
+// void f(int *j) {
+//	*i = 1;
+// }
+//
+// int main() {
+// 	int i = 0;
+// 	f(&i);
+// }
+//
+// main()
+// i will be equal to 1
+//
+// a variable not declared as a pointer will be pre allocated on the stack at
+// compile time and cannot be deferenced
+//
+// local variable are automatically freed at the end of there scope
+// to prevent this we can use static variable
+// static variable lifetime is the lifetime of the program
+//
+
 void read_input(InputBuffer *input_buffer) {
+  // getline() read a line and return the number of bytes read or -1 if error
+  // getline() need a double pointer as a first argument because
+  // in case buffer point to null it will modify buffer to point to a new buffer
+  // so we need to pass the address of buffer to modifying it
   ssize_t bytes_read =
       getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
 
