@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,7 +46,8 @@ void print_prompt() { printf("db > "); }
 // pointer are just variable that store memory address
 // in c everything is passed by value,
 // if we want to modify a variable i with a function,
-// we need to pass a pointer to i to the function to then manipulate the address
+// we need to pass a pointer to i to the function to then manipulate the memory
+// address
 //
 // simply passing the value of i to the function will not work
 // because the value of i will be copied
@@ -54,7 +56,7 @@ void print_prompt() { printf("db > "); }
 // then we can manipulate the value of i with the address
 //
 // void f(int *j) {
-//	*i = 1;
+//	*j = 1;
 // }
 //
 // int main() {
@@ -68,9 +70,13 @@ void print_prompt() { printf("db > "); }
 // a variable not declared as a pointer will be pre allocated on the stack at
 // compile time and cannot be deferenced
 //
-// local variable are automatically freed at the end of there scope
+// local variable are automatically freed at the end of their scope
 // to prevent this we can use static variable
 // static variable lifetime is the lifetime of the program
+//
+// NULL
+// a null pointer is a pointer that points to nothing (no memory address)
+// accessing its value will result in a segmentation fault
 //
 
 void read_input(InputBuffer *input_buffer) {
