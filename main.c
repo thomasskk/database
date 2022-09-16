@@ -76,14 +76,15 @@ void print_prompt() { printf("db > "); }
 //
 // NULL
 // a null pointer is a pointer that points to nothing (no memory address)
-// accessing its value will result in a segmentation fault
+// accessing the value pointed by a null pointer will result in a segmentation
+// fault
 //
 
 void read_input(InputBuffer *input_buffer) {
   // getline() read a line and return the number of bytes read or -1 if error
   // getline() need a double pointer as a first argument because
   // in case buffer point to null it will modify buffer to point to a new buffer
-  // so we need to pass the address of buffer to modifying it
+  // so we need to pass the address of buffer to modify it
   ssize_t bytes_read =
       getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
 
