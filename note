@@ -35,9 +35,7 @@ local variable are automatically freed at the end of their scope
 to prevent this we can use static variable
 static variable lifetime is the lifetime of the program
  
-NULL
-a null pointer is a pointer that points to nothing (no memory address)
-accessing the value pointed by a null pointer will result in a segmentation
-fault
- 
+NULL pointer store the base address of the segment.
+As this address is reserved to represent null pointer accessing it will result in a segmentation
+fault.
 
