@@ -1,8 +1,24 @@
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+typedef struct {
+  char *buffer;
+  size_t buffer_length;
+  ssize_t input_length;
+} InputBuffer;
+
+typedef enum {
+  META_COMMAND_SUCCESS,
+  META_COMMAND_UNRECOGNIZED_COMMAND
+} MetaCommandResult;
+
+typedef enum { PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT } PrepareResult;
+
+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT } StatementType;
 
 // anonymous type alias name InputBuffer for struct InputBuffer
 // the type can be named when we need self-referential struct (typedef struct
@@ -14,16 +30,6 @@
 // struct InputBuffer_S {
 //  InputBuffer *input_buffer;
 // };
-//
-//
-typedef struct {
-  char *buffer;
-  // size_t -> size of an allocated block of memory
-  size_t buffer_length;
-  // ssize_t == size_t, but signed
-  ssize_t input_length;
-} InputBuffer;
-
 InputBuffer *new_input_buffer() {
   // malloc allocate a block of memory on the heap and return a pointer to it
   // to deallocate the memory, we need to pass the pointer to free()
@@ -35,56 +41,100 @@ InputBuffer *new_input_buffer() {
   return input_buffer;
 }
 
-// C use 3 types of memory allocation area : stack, heap and static
-// stack -> memory allocated for local variables
-// heap -> memory allocated for dynamic memory allocation
-// static -> memory allocated for global variables
+// #define is a macro handled by the preprocessor(before compile time) that will
+// replace all instances of the macro name with the macro value in the code.
+#define COLUMN_USERNAME_SIZE 32
+#define COLUMN_EMAIL_SIZE 255
+
+typedef struct {
+  uint32_t id;
+  char username[COLUMN_USERNAME_SIZE];
+  char email[COLUMN_EMAIL_SIZE];
+} Row;
+
+typedef struct {
+  StatementType type;
+  Row row_to_insert;
+} Statement;
+
+// 0 is cast to a pointer of type STRUCT
+// the operand of sizeof is not evaluated so dereferencing a NULL pointer is not
+// a problem
+// sizeof will just infer the type of its operand and return it
+#define size_of_attribute(Struct, Attribute) sizeof(((Struct *)0)->Attribute)
+
+const uint32_t ID_SIZE = size_of_attribute(Row, id);
+const uint32_t USERNAME_SIZE = size_of_attribute(Row, username);
+const uint32_t EMAIL_SIZE = size_of_attribute(Row, email);
+const uint32_t ID_OFFSET = 0;
+const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+
+void serialize_row(Row *source, void *destination) {
+  memcpy(destination + ID_OFFSET, &(source->id), ID_SIZE);
+  memcpy(destination + USERNAME_OFFSET, &(source->username), USERNAME_SIZE);
+  memcpy(destination + EMAIL_OFFSET, &(source->email), EMAIL_SIZE);
+}
+
+void deserialize_row(void *source, Row *destination) {
+  memcpy(&(destination->id), source + ID_OFFSET, ID_SIZE);
+  memcpy(&(destination->username), source + USERNAME_OFFSET, USERNAME_SIZE);
+  memcpy(&(destination->email), source + EMAIL_OFFSET, EMAIL_SIZE);
+}
+
+void close_input_buffer(InputBuffer *input_buffer) { free(input_buffer); }
+
+MetaCommandResult do_meta_command(InputBuffer *input_buffer) {
+  if (strcmp(input_buffer->buffer, ".exit") == 0) {
+    close_input_buffer(input_buffer);
+    exit(EXIT_SUCCESS);
+  } else {
+    return META_COMMAND_UNRECOGNIZED_COMMAND;
+  }
+}
+
+PrepareResult prepare_statement(InputBuffer *input_buffer,
+                                Statement *statement) {
+
+  if (strncmp(input_buffer->buffer, "insert", 6) == 0) {
+    statement->type = STATEMENT_INSERT;
+
+    int args_assigned = sscanf(
+        input_buffer->buffer, "insert %d %s %s", &(statement->row_to_insert.id),
+        statement->row_to_insert.username, statement->row_to_insert.email);
+    if (args_assigned < 3) {
+      return PREPARE_SYNTAX_ERROR;
+    }
+
+    return PREPARE_SUCCESS;
+  }
+
+  if (strcmp(input_buffer->buffer, "select") == 0) {
+    statement->type = STATEMENT_SELECT;
+    return PREPARE_SUCCESS;
+  }
+
+  return PREPARE_UNRECOGNIZED_STATEMENT;
+}
+
+void execute_statement(Statement *statement) {
+  switch (statement->type) {
+  case (STATEMENT_INSERT):
+    printf("This is where we would do an insert.\n");
+    break;
+  case (STATEMENT_SELECT):
+    printf("This is where we would do a select.\n");
+    break;
+  }
+}
 
 void print_prompt() { printf("db > "); }
-
-// & return a pointer
-// pointer are just variable that store memory address
-// in c everything is passed by value,
-// if we want to modify a variable i with a function,
-// we need to pass a pointer to i to the function to then manipulate the memory
-// address
-//
-// simply passing the value of i to the function will not work
-// because the value of i will be copied
-//
-// In this case, we pass the address of i to the function
-// then we can manipulate the value of i with the address
-//
-// void f(int *j) {
-//	*j = 1;
-// }
-//
-// int main() {
-// 	int i = 0;
-// 	f(&i);
-// }
-//
-// main()
-// i will be equal to 1
-//
-// a variable not declared as a pointer will be pre allocated on the stack at
-// compile time and cannot be deferenced
-//
-// local variable are automatically freed at the end of their scope
-// to prevent this we can use static variable
-// static variable lifetime is the lifetime of the program
-//
-// NULL
-// a null pointer is a pointer that points to nothing (no memory address)
-// accessing the value pointed by a null pointer will result in a segmentation
-// fault
-//
 
 void read_input(InputBuffer *input_buffer) {
   // getline() read a line and return the number of bytes read or -1 if error
   // getline() need a double pointer as a first argument because
   // in case buffer point to null it will modify buffer to point to a new buffer
-  // so we need to pass the address of buffer to modify it
   ssize_t bytes_read =
       getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
 
@@ -98,22 +148,32 @@ void read_input(InputBuffer *input_buffer) {
   input_buffer->buffer[bytes_read - 1] = 0;
 }
 
-void close_input_buffer(InputBuffer *input_buffer) {
-  free(input_buffer->buffer);
-  free(input_buffer);
-}
-
 int main(int argc, char *argv[]) {
   InputBuffer *input_buffer = new_input_buffer();
   while (true) {
     print_prompt();
     read_input(input_buffer);
 
-    if (strcmp(input_buffer->buffer, ".exit") == 0) {
-      close_input_buffer(input_buffer);
-      exit(EXIT_SUCCESS);
-    } else {
-      printf("Unrecognized command '%s'.\n", input_buffer->buffer);
+    if (input_buffer->buffer[0] == '.') {
+      switch (do_meta_command(input_buffer)) {
+      case (META_COMMAND_SUCCESS):
+        continue;
+      case (META_COMMAND_UNRECOGNIZED_COMMAND):
+        printf("Unrecognized command '%s'\n", input_buffer->buffer);
+        continue;
+      }
     }
+
+    Statement statement;
+    switch (prepare_statement(input_buffer, &statement)) {
+    case (PREPARE_SUCCESS):
+      break;
+    case (PREPARE_UNRECOGNIZED_STATEMENT):
+      printf("Unrecognized keyword at start of '%s'.\n", input_buffer->buffer);
+      continue;
+    }
+
+    execute_statement(&statement);
+    printf("Executed.\n");
   }
 }
